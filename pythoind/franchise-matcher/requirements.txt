@@ -6,3 +6,4 @@ uvicorn
 fuzzywuzzy
 python-Levenshtein
 tabulate
+httpx
