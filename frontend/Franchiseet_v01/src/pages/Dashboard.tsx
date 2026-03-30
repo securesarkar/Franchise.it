@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, type PotentialMatch } from '../store/useStore';
 import { signOut } from 'firebase/auth';
@@ -31,6 +31,19 @@ const Dashboard = () => {
   const { currentUser, setCurrentUser, setAuthenticated, matches, potentialMatches } = useStore();
   const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'matches' | 'settings'>('overview');
   const [selectedBreakdown, setSelectedBreakdown] = useState<PotentialMatch | null>(null);
+
+  useEffect(() => {
+    if (!selectedBreakdown) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setSelectedBreakdown(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedBreakdown]);
 
   const isFranchisee = currentUser?.role === 'franchisee';
 
@@ -662,7 +675,14 @@ const handleLogout = async () => {
       </div>
 
       {selectedBreakdown && (
-        <div className="fixed inset-0 z-[70] bg-black/70 flex items-center justify-center p-4">
+        <div
+          className="fixed inset-0 z-[70] bg-black/70 flex items-center justify-center p-4"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setSelectedBreakdown(null);
+            }
+          }}
+        >
           <div className="w-full max-w-lg bg-[#0e0e0e] border border-white/10 rounded-2xl p-6">
             <div className="flex items-start justify-between mb-4">
               <div>
