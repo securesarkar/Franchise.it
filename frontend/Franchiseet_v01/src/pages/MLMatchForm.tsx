@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useStore } from '../store/useStore';
+import { fetchMatchesByEmail } from '../services/matchApi';
 import { Button } from '@/components/ui/button';
 import { 
   ArrowRight, 
@@ -17,7 +18,7 @@ import { toast } from 'sonner';
 const MLMatchForm = () => {
   const navigate = useNavigate();
   const { matchId } = useParams();
-  const { currentUser, updateMatchStatus } = useStore();
+  const { currentUser, updateMatchStatus, setPotentialMatches } = useStore();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -237,17 +238,43 @@ const MLMatchForm = () => {
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
-    
-    // Simulate ML processing
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Update match status
-    if (matchId) {
-      updateMatchStatus(matchId, 'mutual_interest');
+
+    try {
+      if (isFranchisee) {
+        const email = currentUser?.personalInfo?.email?.trim();
+        if (!email) {
+          toast.error('No email found in your profile. Please login again.');
+          return;
+        }
+
+        const response = await fetchMatchesByEmail(email);
+        const mappedMatches = response.top_matches.map((item) => ({
+          brandName: item['Brand Name'],
+          contactEmail: item['Contact Email'],
+          totalScore: item.total_score,
+          assetMatchScore: item.asset_match_score,
+          investmentScore: item.investment_score,
+          traitScore: item.trait_score,
+          industryScore: item.industry_score,
+        }));
+
+        setPotentialMatches(mappedMatches);
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+      }
+
+      if (matchId) {
+        updateMatchStatus(matchId, 'mutual_interest');
+      }
+
+      toast.success('ML analysis complete! Match compatibility calculated.');
+      navigate(isFranchisee ? '/matching' : '/dashboard');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to fetch live matches';
+      toast.error(message);
+    } finally {
+      setIsSubmitting(false);
     }
-    
-    toast.success('ML analysis complete! Match compatibility calculated.');
-    navigate('/dashboard');
   };
 
   const currentQuestion = questions[step - 1];
