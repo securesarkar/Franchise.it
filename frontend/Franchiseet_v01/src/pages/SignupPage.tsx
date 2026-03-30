@@ -287,9 +287,9 @@ const SignupPage = () => {
               className={`
                 w-full group flex items-center justify-center gap-2 py-3.5 px-6 rounded-xl
                 font-semibold text-sm transition-all duration-200
-                ${isFormValid && !isLoading
+                ${!isLoading && isFormValid
                   ? 'bg-gradient-to-r from-[#e8b84b] to-[#b8921f] text-[#05070f] shadow-[0_4px_24px_rgba(232,184,75,0.3)] cursor-pointer'
-                  : 'bg-white/5 text-white/25 cursor-not-allowed shadow-none'
+                  : 'bg-white/10 text-white/70 cursor-pointer border border-white/15'
                 }
               `}
             >
