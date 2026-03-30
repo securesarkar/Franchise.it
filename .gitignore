@@ -1,0 +1,6 @@
+frontend/Franchiseet_v01/node_modules/
+frontend/Franchiseet_v01/dist/
+**/__pycache__/
+*.pyc
+.env
+frontend/Franchiseet_v01/.env
