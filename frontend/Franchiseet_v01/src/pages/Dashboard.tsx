@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
-import InteractiveBackground from "@/components/animations/InteractiveBackground";
 import { signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { Button } from '@/components/ui/button';
@@ -29,7 +28,7 @@ import { toast } from 'sonner';
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { currentUser, isAuthenticated, setCurrentUser, setAuthenticated, matches } = useStore();
+  const { currentUser, setCurrentUser, setAuthenticated, matches, potentialMatches } = useStore();
   const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'matches' | 'settings'>('overview');
 
   const isFranchisee = currentUser?.role === 'franchisee';
@@ -229,6 +228,28 @@ const handleLogout = async () => {
                 <p className="text-sm text-white/50">Manage your account preferences</p>
               </button>
             </div>
+
+            {isFranchisee && potentialMatches.length > 0 && (
+              <div className="bg-[#0e0e0e] border border-white/5 rounded-2xl p-6">
+                <h3 className="text-lg font-semibold text-white mb-4">Live Match Score Breakdown</h3>
+                <div className="space-y-3">
+                  {potentialMatches.slice(0, 3).map((match, idx) => (
+                    <div key={`${match.brandName}-${idx}`} className="p-4 bg-[#141414] rounded-xl">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-white font-medium">{match.brandName}</p>
+                        <p className="text-[#d2a855] text-sm font-semibold">{Math.round(match.totalScore)}%</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs text-white/60">
+                        <span>Asset: {match.assetMatchScore.toFixed(1)}</span>
+                        <span>Investment: {match.investmentScore.toFixed(1)}</span>
+                        <span>Traits: {match.traitScore.toFixed(1)}</span>
+                        <span>Industry: {match.industryScore.toFixed(1)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         );
 
@@ -378,6 +399,26 @@ const handleLogout = async () => {
         return (
           <div className="space-y-8">
             <h2 className="text-2xl font-bold text-white">My Matches</h2>
+
+            {isFranchisee && potentialMatches.length > 0 && (
+              <div className="bg-[#0e0e0e] border border-white/5 rounded-2xl p-6">
+                <h3 className="text-lg font-semibold text-white mb-4">Top Live Recommendations</h3>
+                <div className="space-y-3">
+                  {potentialMatches.slice(0, 5).map((match, idx) => (
+                    <div key={`${match.brandName}-${idx}`} className="p-4 bg-[#141414] rounded-xl flex items-center justify-between">
+                      <div>
+                        <p className="text-white font-medium">{match.brandName}</p>
+                        <p className="text-sm text-white/50">{match.contactEmail}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[#d2a855] font-semibold">{Math.round(match.totalScore)}%</p>
+                        <p className="text-xs text-white/50">A {match.assetMatchScore.toFixed(1)} | I {match.investmentScore.toFixed(1)} | T {match.traitScore.toFixed(1)} | In {match.industryScore.toFixed(1)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {userMatches.length === 0 ? (
               <div className="bg-[#0e0e0e] border border-white/5 rounded-2xl p-12 text-center">
