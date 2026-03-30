@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useStore } from '../store/useStore';
-import { fetchMatchesByEmail } from '../services/matchApi';
+import { fetchMatchesByEmail, fetchMatchesByProfile } from '../services/matchApi';
+import { buildProfileMatchRequest } from '../services/matchProfile';
 import { Button } from '@/components/ui/button';
 import { 
   ArrowRight, 
@@ -242,12 +243,18 @@ const MLMatchForm = () => {
     try {
       if (isFranchisee) {
         const email = currentUser?.personalInfo?.email?.trim();
-        if (!email) {
-          toast.error('No email found in your profile. Please login again.');
-          return;
+
+        let response;
+        try {
+          if (!email) {
+            throw new Error('No email available for dataset matching');
+          }
+          response = await fetchMatchesByEmail(email);
+        } catch {
+          response = await fetchMatchesByProfile(buildProfileMatchRequest(currentUser));
+          toast.info('Used profile-based matching for your account');
         }
 
-        const response = await fetchMatchesByEmail(email);
         const mappedMatches = response.top_matches.map((item) => ({
           brandName: item['Brand Name'],
           contactEmail: item['Contact Email'],

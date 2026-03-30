@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, type Match } from '../store/useStore';
-import { fetchMatchesByEmail } from '../services/matchApi';
+import { fetchMatchesByEmail, fetchMatchesByProfile } from '../services/matchApi';
+import { buildProfileMatchRequest } from '../services/matchProfile';
 import { Button } from '@/components/ui/button';
 import {
   Heart,
@@ -87,16 +88,20 @@ const MatchingPage = () => {
   );
 
   const loadLiveMatches = async () => {
-    if (!franchiseeEmail) {
-      setFetchError('No email found on your profile. Please login again.');
-      return;
-    }
-
     setIsLoadingMatches(true);
     setFetchError('');
 
     try {
-      const response = await fetchMatchesByEmail(franchiseeEmail);
+      let response;
+      try {
+        if (!franchiseeEmail) {
+          throw new Error('No email available for dataset matching');
+        }
+        response = await fetchMatchesByEmail(franchiseeEmail);
+      } catch {
+        response = await fetchMatchesByProfile(buildProfileMatchRequest(currentUser));
+      }
+
       const mappedMatches = response.top_matches.map((item) => ({
         brandName: item['Brand Name'],
         contactEmail: item['Contact Email'],

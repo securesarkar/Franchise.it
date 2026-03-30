@@ -13,6 +13,16 @@ export interface MatchApiResponse {
   top_matches: BackendTopMatch[];
 }
 
+export interface MatchProfileRequest {
+  first_name: string;
+  last_name: string;
+  email: string;
+  asset_type: string;
+  liquid_asset_inr: number;
+  preferred_industry: string;
+  traits: string[];
+}
+
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL?.trim() || "http://localhost:8000";
 
@@ -27,6 +37,33 @@ export async function fetchMatchesByEmail(email: string): Promise<MatchApiRespon
 
   if (!response.ok) {
     let message = `Failed to fetch matches (${response.status})`;
+    try {
+      const errorBody = (await response.json()) as { detail?: string };
+      if (errorBody.detail) {
+        message = errorBody.detail;
+      }
+    } catch {
+      // Fall back to default message when error response is not JSON.
+    }
+    throw new Error(message);
+  }
+
+  return (await response.json()) as MatchApiResponse;
+}
+
+export async function fetchMatchesByProfile(
+  payload: MatchProfileRequest,
+): Promise<MatchApiResponse> {
+  const response = await fetch(`${API_BASE_URL}/match/profile`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    let message = `Failed to fetch profile matches (${response.status})`;
     try {
       const errorBody = (await response.json()) as { detail?: string };
       if (errorBody.detail) {
