@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useStore } from '../store/useStore';
+import { useStore, type PotentialMatch } from '../store/useStore';
 import { signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { currentUser, setCurrentUser, setAuthenticated, matches, potentialMatches } = useStore();
   const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'matches' | 'settings'>('overview');
+  const [selectedBreakdown, setSelectedBreakdown] = useState<PotentialMatch | null>(null);
 
   const isFranchisee = currentUser?.role === 'franchisee';
 
@@ -245,6 +246,12 @@ const handleLogout = async () => {
                         <span>Traits: {match.traitScore.toFixed(1)}</span>
                         <span>Industry: {match.industryScore.toFixed(1)}</span>
                       </div>
+                      <button
+                        onClick={() => setSelectedBreakdown(match)}
+                        className="mt-3 text-xs text-[#d2a855] hover:underline"
+                      >
+                        View Full Breakdown
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -409,6 +416,12 @@ const handleLogout = async () => {
                       <div>
                         <p className="text-white font-medium">{match.brandName}</p>
                         <p className="text-sm text-white/50">{match.contactEmail}</p>
+                        <button
+                          onClick={() => setSelectedBreakdown(match)}
+                          className="mt-2 text-xs text-[#d2a855] hover:underline"
+                        >
+                          View Full Breakdown
+                        </button>
                       </div>
                       <div className="text-right">
                         <p className="text-[#d2a855] font-semibold">{Math.round(match.totalScore)}%</p>
@@ -647,6 +660,72 @@ const handleLogout = async () => {
           </div>
         </div>
       </div>
+
+      {selectedBreakdown && (
+        <div className="fixed inset-0 z-[70] bg-black/70 flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-[#0e0e0e] border border-white/10 rounded-2xl p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-xl font-semibold text-white">{selectedBreakdown.brandName}</h3>
+                <p className="text-sm text-white/50">{selectedBreakdown.contactEmail}</p>
+              </div>
+              <button
+                onClick={() => setSelectedBreakdown(null)}
+                className="text-white/60 hover:text-white"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mb-4 p-3 bg-[#141414] rounded-lg border border-[#d2a855]/20">
+              <p className="text-sm text-white/70">Overall Compatibility</p>
+              <p className="text-2xl font-bold text-[#d2a855]">{Math.round(selectedBreakdown.totalScore)}%</p>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <div className="flex items-center justify-between text-sm text-white/70 mb-1">
+                  <span>Asset Match</span>
+                  <span>{selectedBreakdown.assetMatchScore.toFixed(1)} / 30</span>
+                </div>
+                <div className="h-2 bg-[#1d1d1d] rounded-full overflow-hidden">
+                  <div className="h-full bg-[#d2a855]" style={{ width: `${(selectedBreakdown.assetMatchScore / 30) * 100}%` }} />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between text-sm text-white/70 mb-1">
+                  <span>Investment Fit</span>
+                  <span>{selectedBreakdown.investmentScore.toFixed(1)} / 30</span>
+                </div>
+                <div className="h-2 bg-[#1d1d1d] rounded-full overflow-hidden">
+                  <div className="h-full bg-[#d2a855]" style={{ width: `${(selectedBreakdown.investmentScore / 30) * 100}%` }} />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between text-sm text-white/70 mb-1">
+                  <span>Trait Alignment</span>
+                  <span>{selectedBreakdown.traitScore.toFixed(1)} / 30</span>
+                </div>
+                <div className="h-2 bg-[#1d1d1d] rounded-full overflow-hidden">
+                  <div className="h-full bg-[#d2a855]" style={{ width: `${(selectedBreakdown.traitScore / 30) * 100}%` }} />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between text-sm text-white/70 mb-1">
+                  <span>Industry Match</span>
+                  <span>{selectedBreakdown.industryScore.toFixed(1)} / 10</span>
+                </div>
+                <div className="h-2 bg-[#1d1d1d] rounded-full overflow-hidden">
+                  <div className="h-full bg-[#d2a855]" style={{ width: `${(selectedBreakdown.industryScore / 10) * 100}%` }} />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
