@@ -183,6 +183,17 @@ const SignupPage = () => {
       setSignupData({ fullName: form.fullName.trim(), email: form.email.trim(), password: form.password });
       navigate('/signup/role');
     } catch (error: any) {
+      const errorCode = error?.code as string | undefined;
+
+      // Dev-safe fallback: allow local onboarding to continue when Firebase Auth
+      // is not configured yet in the project console.
+      if (errorCode === 'auth/operation-not-allowed' || errorCode === 'auth/configuration-not-found') {
+        setSignupData({ fullName: form.fullName.trim(), email: form.email.trim(), password: form.password });
+        toast.warning('Firebase Auth is not fully configured. Continuing in local mode.');
+        navigate('/signup/role');
+        return;
+      }
+
       const msgs: Record<string, string> = {
         'auth/email-already-in-use': 'An account with this email already exists',
         'auth/weak-password': 'Password must be at least 6 characters',
@@ -191,7 +202,7 @@ const SignupPage = () => {
         'auth/operation-not-allowed': 'Email/password sign-up is not enabled in Firebase Auth.',
         'auth/configuration-not-found': 'Firebase authentication is not configured correctly.',
       };
-      toast.error(msgs[error.code] || 'Signup failed. Please try again.');
+      toast.error(msgs[errorCode || ''] || 'Signup failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
