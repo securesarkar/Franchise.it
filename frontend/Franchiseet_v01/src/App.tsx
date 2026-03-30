@@ -7,6 +7,7 @@ import { ScrollProgress } from './components/ScrollProgress';
 import { AnimatedBackground } from './components/animations/AnimatedBackground';
 import { LoadingScreen } from './components/LoadingAnimation';
 import { PageTransition } from './components/PageTransition';
+import { Toaster } from './components/ui/sonner';
 
 // Pages
 import LandingPage from './pages/LandingPage';
@@ -126,6 +127,8 @@ function App() {
                 </Routes>
               </PageTransition>
             </div>
+
+            <Toaster position="top-right" richColors />
           </div>
         )}
       </Router>

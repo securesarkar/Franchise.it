@@ -188,6 +188,8 @@ const SignupPage = () => {
         'auth/weak-password': 'Password must be at least 6 characters',
         'auth/invalid-email': 'Invalid email address',
         'auth/network-request-failed': 'Network error. Check your connection.',
+        'auth/operation-not-allowed': 'Email/password sign-up is not enabled in Firebase Auth.',
+        'auth/configuration-not-found': 'Firebase authentication is not configured correctly.',
       };
       toast.error(msgs[error.code] || 'Signup failed. Please try again.');
     } finally {
