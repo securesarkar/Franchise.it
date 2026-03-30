@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import pandas as pd
@@ -10,6 +11,7 @@ from data.loader import load_datasets
 from model.matcher import match_franchisee_to_franchisors
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 franchisees_df: pd.DataFrame | None = None
 franchisors_df: pd.DataFrame | None = None
@@ -31,6 +33,11 @@ def match_franchisee(payload: MatchRequest) -> dict[str, Any]:
         raise HTTPException(status_code=500, detail="Datasets are not loaded")
 
     target_email = payload.email.strip().lower()
+    if not target_email:
+        raise HTTPException(status_code=400, detail="Email is required")
+
+    logger.info("Match lookup requested for email=%s", target_email)
+
     franchisee_rows = franchisees_df[
         franchisees_df["Email"].astype(str).str.strip().str.lower() == target_email
     ]
