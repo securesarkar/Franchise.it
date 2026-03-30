@@ -26,54 +26,65 @@ export interface MatchProfileRequest {
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL?.trim() || "http://localhost:8000";
 
-export async function fetchMatchesByEmail(email: string): Promise<MatchApiResponse> {
-  const response = await fetch(`${API_BASE_URL}/match`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ email }),
-  });
+const REQUEST_TIMEOUT_MS = 10000;
+const MAX_RETRIES = 1;
 
-  if (!response.ok) {
-    let message = `Failed to fetch matches (${response.status})`;
-    try {
-      const errorBody = (await response.json()) as { detail?: string };
-      if (errorBody.detail) {
-        message = errorBody.detail;
+async function postWithTimeoutAndRetry<T>(
+  path: string,
+  payload: unknown,
+  attempt = 0,
+): Promise<T> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      let message = `Request failed (${response.status})`;
+      try {
+        const errorBody = (await response.json()) as { detail?: string };
+        if (errorBody.detail) {
+          message = errorBody.detail;
+        }
+      } catch {
+        // Keep default message for non-JSON error responses.
       }
-    } catch {
-      // Fall back to default message when error response is not JSON.
+      throw new Error(message);
     }
-    throw new Error(message);
-  }
 
-  return (await response.json()) as MatchApiResponse;
+    return (await response.json()) as T;
+  } catch (error) {
+    const isAbort = error instanceof DOMException && error.name === "AbortError";
+    const isNetworkIssue = error instanceof TypeError || isAbort;
+
+    if (isNetworkIssue && attempt < MAX_RETRIES) {
+      return postWithTimeoutAndRetry<T>(path, payload, attempt + 1);
+    }
+
+    if (isAbort) {
+      throw new Error("Request timed out. Please try again.");
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+export async function fetchMatchesByEmail(email: string): Promise<MatchApiResponse> {
+  return postWithTimeoutAndRetry<MatchApiResponse>("/match", { email });
 }
 
 export async function fetchMatchesByProfile(
   payload: MatchProfileRequest,
 ): Promise<MatchApiResponse> {
-  const response = await fetch(`${API_BASE_URL}/match/profile`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    let message = `Failed to fetch profile matches (${response.status})`;
-    try {
-      const errorBody = (await response.json()) as { detail?: string };
-      if (errorBody.detail) {
-        message = errorBody.detail;
-      }
-    } catch {
-      // Fall back to default message when error response is not JSON.
-    }
-    throw new Error(message);
-  }
-
-  return (await response.json()) as MatchApiResponse;
+  return postWithTimeoutAndRetry<MatchApiResponse>("/match/profile", payload);
 }
