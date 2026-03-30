@@ -77,6 +77,16 @@ export interface Match {
   createdAt: string;
 }
 
+export interface PotentialMatch {
+  brandName: string;
+  contactEmail: string;
+  totalScore: number;
+  assetMatchScore: number;
+  investmentScore: number;
+  traitScore: number;
+  industryScore: number;
+}
+
 interface AppState {
   // User State
   currentUser: User | null;
@@ -85,7 +95,7 @@ interface AppState {
   
   // Matching State
   matches: Match[];
-  potentialMatches: any[];
+  potentialMatches: PotentialMatch[];
   
   // Actions
   setCurrentUser: (user: User | null) => void;
@@ -94,7 +104,7 @@ interface AppState {
   updateUserProfile: (data: Partial<User>) => void;
   addMatch: (match: Match) => void;
   updateMatchStatus: (matchId: string, status: Match['status']) => void;
-  setPotentialMatches: (matches: any[]) => void;
+  setPotentialMatches: (matches: PotentialMatch[]) => void;
   logout: () => void;
 }
 
