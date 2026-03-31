@@ -1,1 +1,9 @@
--r pythoind/franchise-matcher/requirements.txt
+pandas
+numpy
+scikit-learn
+fastapi
+uvicorn
+fuzzywuzzy
+python-Levenshtein
+tabulate
+httpx
