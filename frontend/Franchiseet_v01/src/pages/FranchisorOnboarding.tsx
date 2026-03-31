@@ -11,10 +11,7 @@ import {
   MapPin, 
   Handshake,
   IndianRupee,
-  CheckCircle2,
-  Users,
-  BookOpen,
-  Target
+  CheckCircle2
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -48,34 +45,12 @@ const FranchisorOnboarding = () => {
     'Pan India',
   ];
 
-  const supportOptions = [
-    'Site Selection Assistance',
-    'Store Design & Setup',
-    'Initial Training Program',
-    'Marketing Support',
-    'Operational Guidance',
-    'Technology Platform',
-    'Supply Chain Management',
-    'Quality Control',
-    'Staff Recruitment Help',
-    'Ongoing Consultation',
-  ];
-
   const toggleLocation = (location: string) => {
     setRequirements(prev => ({
       ...prev,
       preferredLocations: prev.preferredLocations.includes(location)
         ? prev.preferredLocations.filter(l => l !== location)
         : [...prev.preferredLocations, location]
-    }));
-  };
-
-  const toggleSupport = (support: string) => {
-    setRequirements(prev => ({
-      ...prev,
-      supportProvided: prev.supportProvided.includes(support)
-        ? prev.supportProvided.filter(s => s !== support)
-        : [...prev.supportProvided, support]
     }));
   };
 
@@ -89,18 +64,6 @@ const FranchisorOnboarding = () => {
     if (step === 2) {
       if (requirements.preferredLocations.length === 0) {
         toast.error('Please select at least one preferred location');
-        return;
-      }
-    }
-    if (step === 3) {
-      if (requirements.supportProvided.length === 0) {
-        toast.error('Please select at least one support option');
-        return;
-      }
-    }
-    if (step === 4) {
-      if (!requirements.trainingProgram) {
-        toast.error('Please describe your training program');
         return;
       }
       handleComplete();
@@ -247,88 +210,6 @@ const FranchisorOnboarding = () => {
           </div>
         );
 
-      case 3:
-        return (
-          <div className="space-y-6">
-            <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-[#d2a855]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Users className="w-8 h-8 text-[#d2a855]" />
-              </div>
-              <h2 className="text-2xl font-bold text-white mb-2">Support Provided</h2>
-              <p className="text-white/60">What support do you offer to franchisees?</p>
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              {supportOptions.map((support) => (
-                <button
-                  key={support}
-                  onClick={() => toggleSupport(support)}
-                  className={`px-4 py-3 rounded-full text-sm transition-all ${
-                    requirements.supportProvided.includes(support)
-                      ? 'bg-[#d2a855] text-[#141414] font-medium'
-                      : 'bg-[#1d1d1d] text-white/60 border border-white/10 hover:border-white/30'
-                  }`}
-                >
-                  {support}
-                </button>
-              ))}
-            </div>
-
-            {requirements.supportProvided.length > 0 && (
-              <div className="mt-6 p-4 bg-[#d2a855]/10 border border-[#d2a855]/20 rounded-lg">
-                <p className="text-sm text-[#d2a855] mb-2">Selected Support Options:</p>
-                <div className="flex flex-wrap gap-2">
-                  {requirements.supportProvided.map((support) => (
-                    <span key={support} className="px-3 py-1 bg-[#d2a855]/20 text-[#d2a855] text-xs rounded-full">
-                      {support}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        );
-
-      case 4:
-        return (
-          <div className="space-y-6">
-            <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-[#d2a855]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <BookOpen className="w-8 h-8 text-[#d2a855]" />
-              </div>
-              <h2 className="text-2xl font-bold text-white mb-2">Training Program</h2>
-              <p className="text-white/60">Describe your training and onboarding program</p>
-            </div>
-
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <Label className="text-white/80">Training Program Details</Label>
-                <textarea
-                  value={requirements.trainingProgram}
-                  onChange={(e) => setRequirements({ ...requirements, trainingProgram: e.target.value })}
-                  placeholder="Describe your training program including duration, topics covered, mode of training (online/on-site), ongoing support, etc."
-                  rows={8}
-                  className="w-full px-4 py-2 bg-[#1d1d1d] border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-[#d2a855] resize-none"
-                />
-              </div>
-
-              <div className="p-4 bg-[#1d1d1d] border border-white/10 rounded-lg">
-                <h4 className="text-white font-medium mb-2 flex items-center gap-2">
-                  <Target className="w-4 h-4 text-[#d2a855]" />
-                  Suggested Topics to Include:
-                </h4>
-                <ul className="text-sm text-white/60 space-y-1">
-                  <li>• Initial training duration and schedule</li>
-                  <li>• Operational procedures and SOPs</li>
-                  <li>• Marketing and sales training</li>
-                  <li>• Technology and systems training</li>
-                  <li>• Ongoing support and refresher training</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        );
-
       default:
         return null;
     }
@@ -351,13 +232,13 @@ const FranchisorOnboarding = () => {
         {/* Progress */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-white/60 text-sm">Step {step} of 4</span>
-            <span className="text-[#d2a855] text-sm">{Math.round((step / 4) * 100)}% Complete</span>
+            <span className="text-white/60 text-sm">Step {step} of 2</span>
+            <span className="text-[#d2a855] text-sm">{Math.round((step / 2) * 100)}% Complete</span>
           </div>
           <div className="h-2 bg-[#1d1d1d] rounded-full overflow-hidden">
             <div 
               className="h-full bg-gradient-to-r from-[#d2a855] to-[#a88644] transition-all duration-300"
-              style={{ width: `${(step / 4) * 100}%` }}
+              style={{ width: `${(step / 2) * 100}%` }}
             />
           </div>
         </div>
@@ -381,7 +262,7 @@ const FranchisorOnboarding = () => {
               onClick={handleNext}
               className="bg-gradient-to-r from-[#d2a855] to-[#a88644] text-[#141414] hover:opacity-90"
             >
-              {step === 4 ? (
+              {step === 2 ? (
                 <>
                   Complete & Find Franchisees
                   <CheckCircle2 className="w-4 h-4 ml-2" />
