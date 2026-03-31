@@ -17,6 +17,11 @@ app.add_middleware(
 app.include_router(match_router)
 
 
+@app.get("/")
+def root() -> dict[str, str]:
+    return {"status": "API is running"}
+
+
 @app.get("/health")
 def health_check() -> dict[str, str]:
     return {"status": "ok"}
