@@ -60,11 +60,10 @@ type LiveFranchisorMatch = {
 
 const MatchingPage = () => {
   const navigate = useNavigate();
-  const { currentUser, addMatch, potentialMatches, setPotentialMatches } = useStore();
+  const { currentUser, addMatch, matches, potentialMatches, setPotentialMatches } = useStore();
 
   const [activeTab, setActiveTab] = useState<'matches' | 'interested'>('matches');
   const [searchQuery, setSearchQuery] = useState('');
-  const [interestedIds, setInterestedIds] = useState<string[]>([]);
   const [isLoadingMatches, setIsLoadingMatches] = useState(false);
   const [fetchError, setFetchError] = useState('');
 
@@ -131,6 +130,28 @@ const MatchingPage = () => {
 
   const data = isFranchisee ? liveFranchisorMatches : mockFranchisees;
 
+  const userInterestedMatches = useMemo(
+    () =>
+      matches.filter((match) => {
+        const belongsToUser = isFranchisee
+          ? match.franchiseeId === currentUser?.id
+          : match.franchisorId === currentUser?.id;
+        const isInterestFlow =
+          match.status === 'interested_franchisee' ||
+          match.status === 'interested_franchisor' ||
+          match.status === 'mutual_interest' ||
+          match.status === 'matched';
+        return belongsToUser && isInterestFlow;
+      }),
+    [matches, isFranchisee, currentUser?.id],
+  );
+
+  const interestedIdSet = useMemo(() => {
+    return new Set(
+      userInterestedMatches.map((match) => (isFranchisee ? match.franchisorId : match.franchiseeId)),
+    );
+  }, [userInterestedMatches, isFranchisee]);
+
   const filteredData = data.filter((item) => {
     const term = searchQuery.toLowerCase();
     if (isFranchisee) {
@@ -142,12 +163,10 @@ const MatchingPage = () => {
   });
 
   const handleInterest = (id: string) => {
-    if (interestedIds.includes(id)) {
+    if (interestedIdSet.has(id)) {
       toast.info('You have already expressed interest in this match');
       return;
     }
-
-    setInterestedIds((prev) => [...prev, id]);
 
     const selected = data.find((item) => item.id === id);
 
@@ -252,7 +271,7 @@ const MatchingPage = () => {
               <Heart className="w-4 h-4" />
               Interested
               <span className="px-2 py-0.5 bg-[#d2a855]/20 text-[#d2a855] text-xs rounded-full">
-                {interestedIds.length}
+                {userInterestedMatches.length}
               </span>
             </span>
           </button>
@@ -287,7 +306,7 @@ const MatchingPage = () => {
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredData.map((item) => {
                   const id = item.id;
-                  const isInterested = interestedIds.includes(id);
+                  const isInterested = interestedIdSet.has(id);
 
                   return (
                     <div
@@ -380,7 +399,7 @@ const MatchingPage = () => {
           </>
         ) : (
           <div className="text-center py-16">
-            {interestedIds.length === 0 ? (
+            {userInterestedMatches.length === 0 ? (
               <div className="max-w-md mx-auto">
                 <div className="w-20 h-20 bg-[#1d1d1d] rounded-full flex items-center justify-center mx-auto mb-6">
                   <Heart className="w-10 h-10 text-white/20" />
@@ -396,7 +415,33 @@ const MatchingPage = () => {
                 </Button>
               </div>
             ) : (
-              <div className="text-white/70">You have expressed interest in {interestedIds.length} match(es).</div>
+              <div className="max-w-4xl mx-auto grid md:grid-cols-2 gap-4 text-left">
+                {userInterestedMatches.map((match) => {
+                  const companyName = isFranchisee ? match.franchisorName : match.franchiseeName;
+                  const statusLabel =
+                    match.status === 'mutual_interest' || match.status === 'matched'
+                      ? 'Quiz Completed'
+                      : 'Interest Expressed';
+                  const statusClass =
+                    match.status === 'mutual_interest' || match.status === 'matched'
+                      ? 'text-green-400 bg-green-500/10 border-green-500/30'
+                      : 'text-blue-300 bg-blue-500/10 border-blue-500/30';
+
+                  return (
+                    <div key={match.id} className="bg-[#0e0e0e] border border-white/10 rounded-xl p-5">
+                      <div className="flex items-center justify-between gap-3 mb-2">
+                        <p className="text-white font-medium">{companyName || 'Company'}</p>
+                        <span className={`text-xs px-2 py-1 rounded-full border ${statusClass}`}>
+                          {statusLabel}
+                        </span>
+                      </div>
+                      <p className="text-sm text-white/60">
+                        Match Score: <span className="text-[#d2a855]">{match.matchScore}%</span>
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
         )}
