@@ -28,7 +28,7 @@ const EntryPage = () => {
           </div>
           <div>
             <span className="text-2xl font-bold text-white tracking-tight">Franchise</span>
-            <span className="text-2xl font-bold text-[#d2a855] tracking-tight">Match</span>
+            <span className="text-2xl font-bold text-[#d2a855] tracking-tight">It</span>
           </div>
         </motion.div>
 

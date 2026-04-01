@@ -229,7 +229,7 @@ const SignupPage = () => {
           </div>
           <div>
             <span className="text-xl font-bold text-white">Franchise</span>
-            <span className="text-xl font-bold text-[#e8b84b]">Match</span>
+            <span className="text-xl font-bold text-[#e8b84b]">It</span>
           </div>
         </button>
 

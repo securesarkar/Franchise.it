@@ -329,7 +329,7 @@ const FranchiseeOnboarding = () => {
           </div>
           <div>
             <span className="text-xl font-bold text-white">Franchise</span>
-            <span className="text-xl font-bold text-[#d2a855]">Match</span>
+            <span className="text-xl font-bold text-[#d2a855]">It</span>
           </div>
         </div>
 
