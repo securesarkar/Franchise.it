@@ -92,7 +92,7 @@ export function LoadingScreen({ onComplete, duration = 2000 }: LoadingScreenProp
             transition={{ delay: 0.3 }}
           >
             <span className="text-[var(--text-primary)]">Franchise</span>
-            <span className="text-[var(--primary-color)]">Match</span>
+            <span className="text-[var(--primary-color)]">It</span>
           </motion.div>
 
           {/* Progress Bar */}
