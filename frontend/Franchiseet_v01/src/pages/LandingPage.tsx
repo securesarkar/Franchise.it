@@ -90,7 +90,7 @@ const Navigation = () => {
           </motion.div>
           <div>
             <span className="text-xl font-bold text-[var(--text-primary)]">Franchise</span>
-            <span className="text-xl font-bold text-[var(--primary-color)]">Match</span>
+            <span className="text-xl font-bold text-[var(--primary-color)]">It</span>
           </div>
         </motion.div>
 
@@ -210,7 +210,7 @@ const HeroSection = () => {
           transition={{ delay: 0.2 }}
         >
           <Sparkles className="w-4 h-4 text-[var(--primary-color)]" />
-          <span className="text-sm text-[var(--primary-color)]">India&apos;s #1 Franchise Matching Platform</span>
+          <span className="text-sm text-[var(--primary-color)]">India&apos;s 1st Franchise Matching Platform</span>
         </motion.div>
 
         {/* Main Heading */}
@@ -777,7 +777,7 @@ const Footer = () => {
               </div>
               <div>
                 <span className="text-xl font-bold text-[var(--text-primary)]">Franchise</span>
-                <span className="text-xl font-bold text-[var(--primary-color)]">Match</span>
+                <span className="text-xl font-bold text-[var(--primary-color)]">It</span>
               </div>
             </motion.div>
             <p className="text-[var(--text-secondary)] max-w-md mb-6">
