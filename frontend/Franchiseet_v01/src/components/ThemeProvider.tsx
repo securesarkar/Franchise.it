@@ -17,7 +17,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setMounted(true);
     // Check for saved theme preference or system preference
-    const savedTheme = localStorage.getItem('franchisematch-theme') as Theme;
+    const savedTheme = localStorage.getItem('franchiseit-theme') as Theme;
     if (savedTheme) {
       setThemeState(savedTheme);
     } else if (window.matchMedia('(prefers-color-scheme: light)').matches) {
@@ -82,7 +82,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       root.style.setProperty('--gradient-accent', 'linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%)');
     }
 
-    localStorage.setItem('franchisematch-theme', theme);
+    localStorage.setItem('franchiseit-theme', theme);
   }, [theme, mounted]);
 
   const toggleTheme = () => {

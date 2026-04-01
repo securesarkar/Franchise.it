@@ -154,7 +154,7 @@ export const useStore = create<AppState>()(
         }),
     }),
     {
-      name: 'franchisematch-storage',
+      name: 'franchiseit-storage',
       partialize: (state) => ({
         currentUser: state.currentUser,
         isAuthenticated: state.isAuthenticated,

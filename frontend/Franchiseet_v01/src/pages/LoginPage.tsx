@@ -1,6 +1,7 @@
 // At the top, add these imports:
 import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { auth } from '../lib/firebase';
+import { getUserRoleByUid, upsertUserProfile } from '../services/userProfile';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
@@ -33,11 +34,6 @@ const LoginPage = () => {
 
   console.log('handleLogin called'); // ADD THIS FIRST LINE
   
-
-  if (!role) {
-    toast.error('Please select your role');
-    return;
-  }
   if (!email || !password) {
     toast.error('Please enter email and password');
     return;
@@ -52,9 +48,26 @@ const LoginPage = () => {
     console.log('Firebase success:', userCredential.user); // ADD THIS
     const firebaseUser = userCredential.user;
 
+    const roleFromUsers = await getUserRoleByUid(firebaseUser.uid);
+    const resolvedRole = roleFromUsers ?? role;
+
+    if (!resolvedRole) {
+      toast.error('Role not found for this account. Please contact support or complete onboarding again.');
+      setIsLoading(false);
+      return;
+    }
+
+    await upsertUserProfile({
+      uid: firebaseUser.uid,
+      email: firebaseUser.email || email,
+      displayName: firebaseUser.displayName || 'User',
+      role: resolvedRole,
+      photoURL: firebaseUser.photoURL,
+    });
+
     const user = {
       id: firebaseUser.uid,
-      role,
+      role: resolvedRole,
       personalInfo: {
         firstName: firebaseUser.displayName?.split(' ')[0] || 'User',
         lastName: firebaseUser.displayName?.split(' ').slice(1).join(' ') || '',

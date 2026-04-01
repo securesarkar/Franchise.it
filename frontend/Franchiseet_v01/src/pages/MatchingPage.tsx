@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useStore, type Match } from '../store/useStore';
 import { fetchMatchesByEmail, fetchMatchesByProfile } from '../services/matchApi';
 import { buildProfileMatchRequest } from '../services/matchProfile';
+import { useFranchiseesRealtime, useFranchisorsRealtime } from '../hooks/useRoleDatasetsRealtime';
 import { Button } from '@/components/ui/button';
 import {
   Heart,
@@ -17,36 +18,6 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-const mockFranchisees = [
-  {
-    id: 'fe1',
-    name: 'Rajesh Kumar',
-    location: 'Mumbai, Maharashtra',
-    availableCapital: 'Rs1 Crore',
-    preferredIndustries: ['Food & Beverage', 'Retail'],
-    experience: '5 years in retail management',
-    matchScore: 94,
-  },
-  {
-    id: 'fe2',
-    name: 'Priya Sharma',
-    location: 'Bangalore, Karnataka',
-    availableCapital: 'Rs75 Lakhs',
-    preferredIndustries: ['Education', 'Healthcare'],
-    experience: '3 years in education sector',
-    matchScore: 89,
-  },
-  {
-    id: 'fe3',
-    name: 'Amit Patel',
-    location: 'Ahmedabad, Gujarat',
-    availableCapital: 'Rs2 Crores',
-    preferredIndustries: ['Fitness', 'Healthcare'],
-    experience: '7 years in hospitality',
-    matchScore: 92,
-  },
-];
-
 type LiveFranchisorMatch = {
   id: string;
   companyName: string;
@@ -58,6 +29,16 @@ type LiveFranchisorMatch = {
   industryScore: number;
 };
 
+type RealtimeFranchiseeCard = {
+  id: string;
+  name: string;
+  location: string;
+  availableCapital: string;
+  preferredIndustries: string[];
+  experience: string;
+  matchScore: number;
+};
+
 const MatchingPage = () => {
   const navigate = useNavigate();
   const { currentUser, addMatch, matches, potentialMatches, setPotentialMatches } = useStore();
@@ -66,6 +47,16 @@ const MatchingPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoadingMatches, setIsLoadingMatches] = useState(false);
   const [fetchError, setFetchError] = useState('');
+  const {
+    data: realtimeFranchisees,
+    loading: realtimeFranchiseesLoading,
+    error: realtimeFranchiseesError,
+  } = useFranchiseesRealtime();
+  const {
+    data: realtimeFranchisors,
+    loading: realtimeFranchisorsLoading,
+    error: realtimeFranchisorsError,
+  } = useFranchisorsRealtime();
 
   const isFranchisee = currentUser?.role === 'franchisee';
 
@@ -84,6 +75,35 @@ const MatchingPage = () => {
         industryScore: match.industryScore,
       })),
     [potentialMatches],
+  );
+
+  const realtimeFranchisorMatches: LiveFranchisorMatch[] = useMemo(
+    () =>
+      realtimeFranchisors.map((item) => ({
+        id: item.id,
+        companyName: item.displayName || item.email,
+        contactEmail: item.email,
+        matchScore: 50,
+        assetMatchScore: 0,
+        investmentScore: 0,
+        traitScore: 0,
+        industryScore: 0,
+      })),
+    [realtimeFranchisors],
+  );
+
+  const realtimeFranchiseeCards: RealtimeFranchiseeCard[] = useMemo(
+    () =>
+      realtimeFranchisees.map((item) => ({
+        id: item.id,
+        name: item.displayName || item.email,
+        location: 'Location not specified',
+        availableCapital: 'Not specified',
+        preferredIndustries: [],
+        experience: 'Profile synced from Firestore',
+        matchScore: 80,
+      })),
+    [realtimeFranchisees],
   );
 
   const loadLiveMatches = async () => {
@@ -128,7 +148,12 @@ const MatchingPage = () => {
     }
   }, [isFranchisee, potentialMatches.length, franchiseeEmail]);
 
-  const data = isFranchisee ? liveFranchisorMatches : mockFranchisees;
+  const data = isFranchisee
+    ? (liveFranchisorMatches.length > 0 ? liveFranchisorMatches : realtimeFranchisorMatches)
+    : realtimeFranchiseeCards;
+
+  const datasetError = isFranchisee ? realtimeFranchisorsError : realtimeFranchiseesError;
+  const isRealtimeLoading = isFranchisee ? realtimeFranchisorsLoading : realtimeFranchiseesLoading;
 
   const userInterestedMatches = useMemo(
     () =>
@@ -158,7 +183,7 @@ const MatchingPage = () => {
       const liveItem = item as LiveFranchisorMatch;
       return liveItem.companyName.toLowerCase().includes(term);
     }
-    const franchiseeItem = item as (typeof mockFranchisees)[number];
+    const franchiseeItem = item as RealtimeFranchiseeCard;
     return franchiseeItem.name.toLowerCase().includes(term);
   });
 
@@ -176,13 +201,13 @@ const MatchingPage = () => {
       franchisorId: isFranchisee ? id : currentUser?.id || '',
       franchiseeName: isFranchisee
         ? currentUser?.personalInfo?.firstName || ''
-        : (selected as (typeof mockFranchisees)[number])?.name || '',
+        : (selected as RealtimeFranchiseeCard)?.name || '',
       franchisorName: isFranchisee
         ? (selected as LiveFranchisorMatch)?.companyName || ''
         : currentUser?.personalInfo?.firstName || '',
       franchiseeCompany: '',
       franchisorCompany: isFranchisee ? (selected as LiveFranchisorMatch)?.companyName || '' : '',
-      matchScore: (selected as LiveFranchisorMatch)?.matchScore || (selected as (typeof mockFranchisees)[number])?.matchScore || 0,
+      matchScore: (selected as LiveFranchisorMatch)?.matchScore || (selected as RealtimeFranchiseeCard)?.matchScore || 0,
       status: (isFranchisee ? 'interested_franchisee' : 'interested_franchisor') as Match['status'],
       createdAt: new Date().toISOString(),
     };
@@ -229,7 +254,7 @@ const MatchingPage = () => {
             <p className="text-white/60">
               {isFranchisee
                 ? 'These recommendations are fetched from the Python matching API.'
-                : 'Franchisor workflow remains local until backend support is expanded.'}
+                : 'This list uses a realtime Firestore listener on franchisee records.'}
             </p>
           </div>
 
@@ -296,7 +321,13 @@ const MatchingPage = () => {
               </div>
             )}
 
-            {isLoadingMatches ? (
+            {datasetError && (
+              <div className="mb-6 p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-200 text-sm">
+                {datasetError}
+              </div>
+            )}
+
+            {isLoadingMatches || (!isFranchisee && isRealtimeLoading) ? (
               <div className="text-white/60">Loading live matches...</div>
             ) : filteredData.length === 0 ? (
               <div className="text-center py-16 text-white/60">
@@ -323,12 +354,12 @@ const MatchingPage = () => {
                               <h3 className="text-lg font-semibold text-white">
                                 {isFranchisee
                                   ? (item as LiveFranchisorMatch).companyName
-                                  : (item as (typeof mockFranchisees)[number]).name}
+                                  : (item as RealtimeFranchiseeCard).name}
                               </h3>
                               <p className="text-sm text-white/50">
                                 {isFranchisee
                                   ? (item as LiveFranchisorMatch).contactEmail
-                                  : (item as (typeof mockFranchisees)[number]).location}
+                                  : (item as RealtimeFranchiseeCard).location}
                               </p>
                             </div>
                           </div>
@@ -337,7 +368,7 @@ const MatchingPage = () => {
                             <span className="text-sm font-medium text-[#d2a855]">
                               {isFranchisee
                                 ? (item as LiveFranchisorMatch).matchScore
-                                : (item as (typeof mockFranchisees)[number]).matchScore}
+                                : (item as RealtimeFranchiseeCard).matchScore}
                               %
                             </span>
                           </div>
@@ -352,7 +383,7 @@ const MatchingPage = () => {
                           </div>
                         ) : (
                           <p className="text-sm text-white/60">
-                            {(item as (typeof mockFranchisees)[number]).availableCapital}
+                            {(item as RealtimeFranchiseeCard).availableCapital}
                           </p>
                         )}
                       </div>
@@ -365,7 +396,7 @@ const MatchingPage = () => {
                           </div>
                         ) : (
                           <p className="text-sm text-white/60 mb-4">
-                            {(item as (typeof mockFranchisees)[number]).experience}
+                            {(item as RealtimeFranchiseeCard).experience}
                           </p>
                         )}
 

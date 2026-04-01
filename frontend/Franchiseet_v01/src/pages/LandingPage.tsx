@@ -338,7 +338,7 @@ const AboutSection = () => {
               Building Bridges in the <span className="gradient-text">Franchise World</span>
             </h2>
             <p className="text-[var(--text-secondary)] text-lg mb-6">
-              FranchiseMatch is India&apos;s premier platform connecting ambitious franchisees with 
+              FranchiseIt is India&apos;s premier platform connecting ambitious franchisees with 
               established franchisors. We understand that finding the right franchise partner 
               is crucial for business success.
             </p>
@@ -845,7 +845,7 @@ const Footer = () => {
 
         <div className="pt-8 border-t border-[var(--border-color)] flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-[var(--text-muted)] text-sm">
-            © 2024 FranchiseMatch. All rights reserved.
+            © 2024 FranchiseIt. All rights reserved.
           </p>
           <div className="flex gap-6">
             {['Privacy Policy', 'Terms of Service', 'Cookie Policy'].map((link) => (

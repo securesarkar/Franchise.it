@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { auth } from '../lib/firebase';
+import { upsertUserProfile } from '../services/userProfile';
 import { useSignupStore } from '../store/useSignupStore';
 import { useStore } from '../store/useStore';
 import {
@@ -160,16 +162,29 @@ const RoleSelectionPage = () => {
     completeSignup('franchisee', result);
   };
 
-  const completeSignup = (role: RoleKey, psychResult: any) => {
+  const completeSignup = async (role: RoleKey, psychResult: any) => {
     setIsLoading(true);
 
-    setTimeout(() => {
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 600));
       const isEmailVal = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
       const email = isEmailVal(signupData.email ?? '') ? signupData.email! : '';
       const nameParts = signupData.fullName.split(' ');
+      const firebaseUser = auth.currentUser;
+      const uid = firebaseUser?.uid || `user_${Date.now()}`;
+
+      if (firebaseUser) {
+        await upsertUserProfile({
+          uid,
+          email: firebaseUser.email || email,
+          displayName: signupData.fullName.trim(),
+          role,
+          photoURL: firebaseUser.photoURL,
+        });
+      }
 
       const newUser = {
-        id: 'user_' + Date.now(),
+        id: uid,
         role,
         personalInfo: {
           firstName: nameParts[0] ?? '',
@@ -186,11 +201,15 @@ const RoleSelectionPage = () => {
       setFirstVisit(false);
       setSignupData({ role });
       clearSignupData();
-      setIsLoading(false);
 
       toast.success("Account created! Let's complete your profile.");
       navigate(role === 'franchisee' ? '/onboarding/franchisee' : '/onboarding/franchisor');
-    }, 600);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to sync user profile';
+      toast.error(message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // ── Psychometric view ────────────────────────────────────────────────────────
@@ -286,7 +305,7 @@ const RoleSelectionPage = () => {
             Hey {signupData.fullName.split(' ')[0]}, what's your role?
           </h2>
           <p className="text-[var(--text-secondary)] text-sm">
-            This helps us personalise your FranchiseMatch experience
+            This helps us personalise your FranchiseIt experience
           </p>
         </div>
 
