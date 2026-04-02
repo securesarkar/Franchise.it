@@ -155,6 +155,30 @@ const MatchingPage = () => {
   const datasetError = isFranchisee ? realtimeFranchisorsError : realtimeFranchiseesError;
   const isRealtimeLoading = isFranchisee ? realtimeFranchisorsLoading : realtimeFranchiseesLoading;
 
+  useEffect(() => {
+    console.info('[matching] state', {
+      role: currentUser?.role,
+      isFranchisee,
+      potentialMatchesCount: potentialMatches.length,
+      realtimeFranchisorsCount: realtimeFranchisors.length,
+      realtimeFranchiseesCount: realtimeFranchisees.length,
+      isLoadingMatches,
+      isRealtimeLoading,
+      fetchError,
+      datasetError,
+    });
+  }, [
+    currentUser?.role,
+    datasetError,
+    fetchError,
+    isFranchisee,
+    isLoadingMatches,
+    isRealtimeLoading,
+    potentialMatches.length,
+    realtimeFranchisees.length,
+    realtimeFranchisors.length,
+  ]);
+
   const userInterestedMatches = useMemo(
     () =>
       matches.filter((match) => {
@@ -323,7 +347,7 @@ const MatchingPage = () => {
 
             {datasetError && (
               <div className="mb-6 p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-200 text-sm">
-                {datasetError}
+                Live Firestore feed error: {datasetError}
               </div>
             )}
 
