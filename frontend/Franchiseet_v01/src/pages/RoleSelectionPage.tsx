@@ -174,13 +174,17 @@ const RoleSelectionPage = () => {
       const uid = firebaseUser?.uid || `user_${Date.now()}`;
 
       if (firebaseUser) {
-        await upsertUserProfile({
-          uid,
-          email: firebaseUser.email || email,
-          displayName: signupData.fullName.trim(),
-          role,
-          photoURL: firebaseUser.photoURL,
-        });
+        try {
+          await upsertUserProfile({
+            uid,
+            email: firebaseUser.email || email,
+            displayName: signupData.fullName.trim(),
+            role,
+            photoURL: firebaseUser.photoURL,
+          });
+        } catch {
+          toast.warning('Account created, but cloud profile sync failed. You can continue onboarding.');
+        }
       }
 
       const newUser = {
@@ -205,7 +209,7 @@ const RoleSelectionPage = () => {
       toast.success("Account created! Let's complete your profile.");
       navigate(role === 'franchisee' ? '/onboarding/franchisee' : '/onboarding/franchisor');
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to sync user profile';
+      const message = error instanceof Error ? error.message : 'Failed to complete signup';
       toast.error(message);
     } finally {
       setIsLoading(false);

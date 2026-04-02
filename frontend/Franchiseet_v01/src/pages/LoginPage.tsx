@@ -1,5 +1,4 @@
-// At the top, add these imports:
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { getUserRoleByUid, upsertUserProfile } from '../services/userProfile';
 import { useState } from 'react';
@@ -32,38 +31,29 @@ const LoginPage = () => {
 
   const handleLogin = async () => { 
 
-  console.log('handleLogin called'); // ADD THIS FIRST LINE
-  
   if (!email || !password) {
     toast.error('Please enter email and password');
     return;
   }
 
-   console.log('Attempting Firebase login with:', email);
   setIsLoading(true);
 
   try {
-    console.log('Calling signInWithEmailAndPassword...'); // ADD THIS
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    console.log('Firebase success:', userCredential.user); // ADD THIS
     const firebaseUser = userCredential.user;
 
-    const roleFromUsers = await getUserRoleByUid(firebaseUser.uid);
-    const resolvedRole = roleFromUsers ?? role;
-
-    if (!resolvedRole) {
-      toast.error('Role not found for this account. Please contact support or complete onboarding again.');
-      setIsLoading(false);
-      return;
+    let resolvedRole = role;
+    try {
+      const roleFromUsers = await getUserRoleByUid(firebaseUser.uid);
+      resolvedRole = roleFromUsers ?? role;
+    } catch {
+      // Ignore lookup errors and continue login with selected/default role.
     }
 
-    await upsertUserProfile({
-      uid: firebaseUser.uid,
-      email: firebaseUser.email || email,
-      displayName: firebaseUser.displayName || 'User',
-      role: resolvedRole,
-      photoURL: firebaseUser.photoURL,
-    });
+    if (!resolvedRole) {
+      resolvedRole = 'franchisee';
+      toast.warning('Role was missing in profile. Signed in with a default role.');
+    }
 
     const user = {
       id: firebaseUser.uid,
@@ -84,12 +74,22 @@ const LoginPage = () => {
     setCurrentUser(user as any);
     setAuthenticated(true);
     setFirstVisit(false);
+
+    try {
+      await upsertUserProfile({
+        uid: firebaseUser.uid,
+        email: firebaseUser.email || email,
+        displayName: firebaseUser.displayName || 'User',
+        role: resolvedRole,
+        photoURL: firebaseUser.photoURL,
+      });
+    } catch {
+      toast.warning('Signed in, but profile sync failed. Please try again later.');
+    }
+
     toast.success('Welcome back!');
     navigate('/dashboard');
   } catch (error: any) {
-  console.log('Firebase error code:', error.code); // ADD THIS
-  console.log('Firebase error message:', error.message); // ADD THIS
-  
   const errorMessages: Record<string, string> = {
     'auth/user-not-found': 'No account found with this email',
     'auth/wrong-password': 'Incorrect password',
