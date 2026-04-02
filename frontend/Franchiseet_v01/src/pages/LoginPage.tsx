@@ -1,6 +1,6 @@
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../lib/firebase';
-import { getUserRoleByUid, upsertUserProfile } from '../services/userProfile';
+import { getUserProfileByUid, getUserRoleByUid, upsertUserProfile } from '../services/userProfile';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
@@ -41,6 +41,7 @@ const LoginPage = () => {
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const firebaseUser = userCredential.user;
+    const profileData = await getUserProfileByUid(firebaseUser.uid);
 
     let resolvedRole = role;
     try {
@@ -59,16 +60,21 @@ const LoginPage = () => {
       id: firebaseUser.uid,
       role: resolvedRole,
       personalInfo: {
-        firstName: firebaseUser.displayName?.split(' ')[0] || 'User',
-        lastName: firebaseUser.displayName?.split(' ').slice(1).join(' ') || '',
-        email: firebaseUser.email || email,
-        phone: firebaseUser.phoneNumber || '',
-        address: '',
-        city: '',
-        state: '',
-        zipCode: '',
+        firstName: profileData?.personalInfo?.firstName || firebaseUser.displayName?.split(' ')[0] || 'User',
+        lastName: profileData?.personalInfo?.lastName || firebaseUser.displayName?.split(' ').slice(1).join(' ') || '',
+        email: profileData?.personalInfo?.email || firebaseUser.email || email,
+        phone: profileData?.personalInfo?.phone || firebaseUser.phoneNumber || '',
+        address: profileData?.personalInfo?.address || '',
+        city: profileData?.personalInfo?.city || '',
+        state: profileData?.personalInfo?.state || '',
+        zipCode: profileData?.personalInfo?.zipCode || '',
       },
-      isProfileComplete: false,
+      businessInfo: profileData?.businessInfo,
+      requirements: profileData?.requirements,
+      assets: profileData?.assets,
+      psychometricResult: profileData?.psychometricResult,
+      brandPreferences: profileData?.brandPreferences,
+      isProfileComplete: Boolean(profileData?.isProfileComplete),
     };
 
     setCurrentUser(user as any);

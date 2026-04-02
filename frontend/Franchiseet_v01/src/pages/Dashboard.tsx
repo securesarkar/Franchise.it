@@ -32,7 +32,7 @@ import { toast } from 'sonner';
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { currentUser, setCurrentUser, setAuthenticated, matches, potentialMatches } = useStore();
+  const { currentUser, setCurrentUser, setAuthenticated, updateUserProfile, matches, potentialMatches } = useStore();
   const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'matches' | 'settings'>('overview');
   const [selectedBreakdown, setSelectedBreakdown] = useState<PotentialMatch | null>(null);
   const [isEditingRequirements, setIsEditingRequirements] = useState(false);
@@ -117,8 +117,7 @@ const handleLogout = async () => {
     setIsSavingRequirements(true);
 
     try {
-      setCurrentUser({
-        ...currentUser,
+      updateUserProfile({
         requirements: requirementsForm,
       });
 

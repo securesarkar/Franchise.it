@@ -107,6 +107,17 @@ export async function getUserRoleByUid(uid: string): Promise<AppRole | null> {
   return null;
 }
 
+export async function getUserProfileByUid(uid: string): Promise<DocumentData | null> {
+  const userRef = doc(db, 'users', uid);
+  const snap = await getDoc(userRef);
+
+  if (!snap.exists()) {
+    return null;
+  }
+
+  return snap.data();
+}
+
 export function timestampToMillis(value: unknown): number {
   if (!value) return 0;
 
@@ -143,8 +154,11 @@ export async function updateFranchisorRequirements(
   const userRef = doc(db, 'users', uid);
   const franchisorRef = doc(db, 'franchisors', uid);
 
-  await Promise.all([
-    setDoc(userRef, { requirements, updatedAt: now }, { merge: true }),
-    setDoc(franchisorRef, { requirements, updatedAt: now }, { merge: true }),
-  ]);
+  await setDoc(userRef, { requirements, updatedAt: now }, { merge: true });
+
+  try {
+    await setDoc(franchisorRef, { requirements, updatedAt: now }, { merge: true });
+  } catch {
+    // Keep local/user profile save successful even if role collection rules block this write.
+  }
 }
