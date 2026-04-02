@@ -29,6 +29,22 @@ const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  const getFirebaseAuthErrorMessage = (error: unknown): string => {
+    const authError = error as { code?: string; message?: string };
+
+    const errorMessages: Record<string, string> = {
+      'auth/invalid-credential': 'Invalid email or password.',
+      'auth/user-not-found': 'No account found with this email.',
+      'auth/wrong-password': 'Incorrect password.',
+      'auth/invalid-email': 'Invalid email address.',
+      'auth/too-many-requests': 'Too many attempts. Please try again later.',
+      'auth/network-request-failed': 'Network error. Please check your internet connection and retry.',
+      'auth/user-disabled': 'This account has been disabled. Please contact support.',
+    };
+
+    return errorMessages[authError.code || ''] || authError.message || 'Login failed. Please try again.';
+  };
+
   const handleLogin = async () => { 
 
   if (!email || !password) {
@@ -41,14 +57,21 @@ const LoginPage = () => {
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const firebaseUser = userCredential.user;
-    const profileData = await getUserProfileByUid(firebaseUser.uid);
+
+    let profileData: any = null;
+    try {
+      profileData = await getUserProfileByUid(firebaseUser.uid);
+    } catch (profileError) {
+      console.error('[login] profile lookup failed; continuing with auth session', profileError);
+      toast.warning('Signed in, but profile data is currently unavailable.');
+    }
 
     let resolvedRole = role;
     try {
       const roleFromUsers = await getUserRoleByUid(firebaseUser.uid);
       resolvedRole = roleFromUsers ?? role;
-    } catch {
-      // Ignore lookup errors and continue login with selected/default role.
+    } catch (roleError) {
+      console.error('[login] role lookup failed; using selected/default role', roleError);
     }
 
     if (!resolvedRole) {
@@ -89,21 +112,20 @@ const LoginPage = () => {
         role: resolvedRole,
         photoURL: firebaseUser.photoURL,
       });
-    } catch {
+    } catch (syncError) {
+      console.error('[login] profile sync failed; auth session remains active', syncError);
       toast.warning('Signed in, but profile sync failed. Please try again later.');
     }
 
     toast.success('Welcome back!');
     navigate('/dashboard');
-  } catch (error: any) {
-  const errorMessages: Record<string, string> = {
-    'auth/user-not-found': 'No account found with this email',
-    'auth/wrong-password': 'Incorrect password',
-    'auth/invalid-email': 'Invalid email address',
-    'auth/too-many-requests': 'Too many attempts. Please try again later',
-    'auth/invalid-credential': 'Invalid email or password',
-  };
-  toast.error(errorMessages[error.code] || 'Login failed. Please try again.');
+  } catch (error) {
+  const authError = error as { code?: string; message?: string };
+  console.error('[login] firebase auth sign-in failed', {
+    code: authError.code,
+    message: authError.message,
+  });
+  toast.error(getFirebaseAuthErrorMessage(error));
 }finally {
     setIsLoading(false);
   }
