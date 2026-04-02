@@ -3,7 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { useStore, type Match } from '../store/useStore';
 import { fetchMatchesByEmail, fetchMatchesByProfile } from '../services/matchApi';
 import { buildProfileMatchRequest } from '../services/matchProfile';
-import { useFranchiseesRealtime, useFranchisorsRealtime } from '../hooks/useRoleDatasetsRealtime';
+import {
+  getFallbackFranchiseeCards,
+  getFallbackFranchisorMatches,
+  type FallbackFranchiseeCard,
+  type FallbackFranchisorMatch,
+} from '../services/matchFallback';
 import { Button } from '@/components/ui/button';
 import {
   Heart,
@@ -29,7 +34,7 @@ type LiveFranchisorMatch = {
   industryScore: number;
 };
 
-type RealtimeFranchiseeCard = {
+type LocalFranchiseeCard = {
   id: string;
   name: string;
   location: string;
@@ -39,149 +44,194 @@ type RealtimeFranchiseeCard = {
   matchScore: number;
 };
 
+type MatchSource = 'api' | 'fallback' | null;
+
 const MatchingPage = () => {
   const navigate = useNavigate();
-  const { currentUser, addMatch, matches, potentialMatches, setPotentialMatches } = useStore();
+  const { currentUser, addMatch, matches, setPotentialMatches } = useStore();
 
   const [activeTab, setActiveTab] = useState<'matches' | 'interested'>('matches');
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoadingMatches, setIsLoadingMatches] = useState(false);
   const [fetchError, setFetchError] = useState('');
-  const {
-    data: realtimeFranchisees,
-    loading: realtimeFranchiseesLoading,
-    error: realtimeFranchiseesError,
-  } = useFranchiseesRealtime();
-  const {
-    data: realtimeFranchisors,
-    loading: realtimeFranchisorsLoading,
-    error: realtimeFranchisorsError,
-  } = useFranchisorsRealtime();
+  const [matchSource, setMatchSource] = useState<MatchSource>(null);
+  const [franchisorMatches, setFranchisorMatches] = useState<LiveFranchisorMatch[]>([]);
+  const [franchiseeCards, setFranchiseeCards] = useState<LocalFranchiseeCard[]>([]);
 
   const isFranchisee = currentUser?.role === 'franchisee';
 
   const franchiseeEmail = currentUser?.personalInfo?.email?.trim() || '';
 
-  const liveFranchisorMatches: LiveFranchisorMatch[] = useMemo(
-    () =>
-      potentialMatches.map((match, index) => ({
-        id: `${match.brandName}-${index}`,
-        companyName: match.brandName,
-        contactEmail: match.contactEmail,
-        matchScore: Math.round(match.totalScore),
-        assetMatchScore: match.assetMatchScore,
-        investmentScore: match.investmentScore,
-        traitScore: match.traitScore,
-        industryScore: match.industryScore,
-      })),
-    [potentialMatches],
-  );
+  const mapApiTopMatchesToFranchisors = (topMatches: Awaited<ReturnType<typeof fetchMatchesByProfile>>['top_matches']): LiveFranchisorMatch[] => {
+    return topMatches.map((item, index) => ({
+      id: `api-franchisor-${index}`,
+      companyName: item['Brand Name'],
+      contactEmail: item['Contact Email'],
+      matchScore: Math.round(item.total_score),
+      assetMatchScore: item.asset_match_score,
+      investmentScore: item.investment_score,
+      traitScore: item.trait_score,
+      industryScore: item.industry_score,
+    }));
+  };
 
-  const realtimeFranchisorMatches: LiveFranchisorMatch[] = useMemo(
-    () =>
-      realtimeFranchisors.map((item) => ({
-        id: item.id,
-        companyName: item.displayName || item.email,
-        contactEmail: item.email,
-        matchScore: 50,
-        assetMatchScore: 0,
-        investmentScore: 0,
-        traitScore: 0,
-        industryScore: 0,
-      })),
-    [realtimeFranchisors],
-  );
+  const mapApiTopMatchesToFranchisees = (topMatches: Awaited<ReturnType<typeof fetchMatchesByProfile>>['top_matches']): LocalFranchiseeCard[] => {
+    return topMatches.map((item, index) => ({
+      id: `api-franchisee-${index}`,
+      name: item['Brand Name'],
+      location: 'Returned by backend matching API',
+      availableCapital: 'Available after mutual interest',
+      preferredIndustries: [],
+      experience: `Contact: ${item['Contact Email']}`,
+      matchScore: Math.round(item.total_score),
+    }));
+  };
 
-  const realtimeFranchiseeCards: RealtimeFranchiseeCard[] = useMemo(
-    () =>
-      realtimeFranchisees.map((item) => ({
-        id: item.id,
-        name: item.displayName || item.email,
-        location: 'Location not specified',
-        availableCapital: 'Not specified',
-        preferredIndustries: [],
-        experience: 'Profile synced from Firestore',
-        matchScore: 80,
-      })),
-    [realtimeFranchisees],
-  );
+  const toFranchisorMatches = (matchesInput: FallbackFranchisorMatch[]): LiveFranchisorMatch[] =>
+    matchesInput.map((item) => ({
+      id: item.id,
+      companyName: item.companyName,
+      contactEmail: item.contactEmail,
+      matchScore: item.matchScore,
+      assetMatchScore: item.assetMatchScore,
+      investmentScore: item.investmentScore,
+      traitScore: item.traitScore,
+      industryScore: item.industryScore,
+    }));
+
+  const toFranchiseeCards = (cards: FallbackFranchiseeCard[]): LocalFranchiseeCard[] =>
+    cards.map((item) => ({ ...item }));
+
+  const toFriendlyError = (error: unknown): string => {
+    const message = error instanceof Error ? error.message : 'Unable to load matches.';
+    if (/timeout|network|failed to fetch|request failed/i.test(message)) {
+      return 'Unable to reach live matching service. Showing fallback recommendations.';
+    }
+    return message;
+  };
 
   const loadLiveMatches = async () => {
     setIsLoadingMatches(true);
     setFetchError('');
 
     try {
-      let response;
+      let response: Awaited<ReturnType<typeof fetchMatchesByProfile>> | null = null;
       try {
-        if (!franchiseeEmail) {
-          throw new Error('No email available for dataset matching');
+        if (franchiseeEmail) {
+          response = await fetchMatchesByEmail(franchiseeEmail);
+        } else {
+          response = await fetchMatchesByProfile(buildProfileMatchRequest(currentUser));
         }
-        response = await fetchMatchesByEmail(franchiseeEmail);
-      } catch {
-        response = await fetchMatchesByProfile(buildProfileMatchRequest(currentUser));
+
+        if (isFranchisee) {
+          const apiMatches = mapApiTopMatchesToFranchisors(response.top_matches);
+          setFranchisorMatches(apiMatches);
+          setPotentialMatches(
+            response.top_matches.map((item) => ({
+              brandName: item['Brand Name'],
+              contactEmail: item['Contact Email'],
+              totalScore: item.total_score,
+              assetMatchScore: item.asset_match_score,
+              investmentScore: item.investment_score,
+              traitScore: item.trait_score,
+              industryScore: item.industry_score,
+            })),
+          );
+        } else {
+          const apiCards = mapApiTopMatchesToFranchisees(response.top_matches);
+          setFranchiseeCards(apiCards);
+        }
+
+        if (response.top_matches.length > 0) {
+          setMatchSource('api');
+          console.info('[matching] loaded matches from api', {
+            role: currentUser?.role,
+            count: response.top_matches.length,
+          });
+          return;
+        }
+
+        throw new Error('API returned empty matches');
+      } catch (apiError) {
+        const fallbackFranchisors = toFranchisorMatches(getFallbackFranchisorMatches(currentUser));
+        const fallbackFranchisees = toFranchiseeCards(getFallbackFranchiseeCards(currentUser));
+
+        if (isFranchisee) {
+          setFranchisorMatches(fallbackFranchisors);
+          setPotentialMatches(
+            fallbackFranchisors.map((item) => ({
+              brandName: item.companyName,
+              contactEmail: item.contactEmail,
+              totalScore: item.matchScore,
+              assetMatchScore: item.assetMatchScore,
+              investmentScore: item.investmentScore,
+              traitScore: item.traitScore,
+              industryScore: item.industryScore,
+            })),
+          );
+        } else {
+          setFranchiseeCards(fallbackFranchisees);
+        }
+
+        setMatchSource('fallback');
+        setFetchError(toFriendlyError(apiError));
+        console.error('[matching] api failed, using fallback dataset', apiError);
+        toast.warning('Using fallback recommendations');
       }
-
-      const mappedMatches = response.top_matches.map((item) => ({
-        brandName: item['Brand Name'],
-        contactEmail: item['Contact Email'],
-        totalScore: item.total_score,
-        assetMatchScore: item.asset_match_score,
-        investmentScore: item.investment_score,
-        traitScore: item.trait_score,
-        industryScore: item.industry_score,
-      }));
-
-      setPotentialMatches(mappedMatches);
-      toast.success('Live matches loaded from backend');
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to fetch matches';
-      setFetchError(message);
-      toast.error(message);
+      setFetchError('Unable to load recommendations right now. Please retry.');
+      console.error('[matching] failed to load both api and fallback', error);
     } finally {
       setIsLoadingMatches(false);
     }
   };
 
   useEffect(() => {
-    if (isFranchisee && potentialMatches.length === 0 && franchiseeEmail) {
+    if (!currentUser) return;
+    if (isFranchisee && franchisorMatches.length > 0) return;
+    if (!isFranchisee && franchiseeCards.length > 0) return;
+
+    if (isFranchisee && !franchiseeEmail && !currentUser.personalInfo?.firstName) {
+      return;
+    }
+
+    if (matchSource === null) {
       void loadLiveMatches();
     }
-  }, [isFranchisee, potentialMatches.length, franchiseeEmail]);
+  }, [
+    currentUser,
+    isFranchisee,
+    franchisorMatches.length,
+    franchiseeCards.length,
+    franchiseeEmail,
+    matchSource,
+  ]);
 
-  const data = isFranchisee
-    ? (liveFranchisorMatches.length > 0 ? liveFranchisorMatches : realtimeFranchisorMatches)
-    : realtimeFranchiseeCards;
-
-  const datasetError = isFranchisee ? realtimeFranchisorsError : realtimeFranchiseesError;
-  const isRealtimeLoading = isFranchisee ? realtimeFranchisorsLoading : realtimeFranchiseesLoading;
+  const data: Array<LiveFranchisorMatch | LocalFranchiseeCard> = isFranchisee
+    ? franchisorMatches
+    : franchiseeCards;
 
   useEffect(() => {
     console.info('[matching] state', {
       role: currentUser?.role,
       isFranchisee,
-      potentialMatchesCount: potentialMatches.length,
-      realtimeFranchisorsCount: realtimeFranchisors.length,
-      realtimeFranchiseesCount: realtimeFranchisees.length,
+      source: matchSource,
+      visibleCount: data.length,
       isLoadingMatches,
-      isRealtimeLoading,
       fetchError,
-      datasetError,
     });
   }, [
     currentUser?.role,
-    datasetError,
+    data.length,
     fetchError,
     isFranchisee,
     isLoadingMatches,
-    isRealtimeLoading,
-    potentialMatches.length,
-    realtimeFranchisees.length,
-    realtimeFranchisors.length,
+    matchSource,
   ]);
 
   const userInterestedMatches = useMemo(
     () =>
-      matches.filter((match) => {
+      matches.filter((match: Match) => {
         const belongsToUser = isFranchisee
           ? match.franchiseeId === currentUser?.id
           : match.franchisorId === currentUser?.id;
@@ -197,17 +247,17 @@ const MatchingPage = () => {
 
   const interestedIdSet = useMemo(() => {
     return new Set(
-      userInterestedMatches.map((match) => (isFranchisee ? match.franchisorId : match.franchiseeId)),
+      userInterestedMatches.map((match: Match) => (isFranchisee ? match.franchisorId : match.franchiseeId)),
     );
   }, [userInterestedMatches, isFranchisee]);
 
-  const filteredData = data.filter((item) => {
+  const filteredData = data.filter((item: LiveFranchisorMatch | LocalFranchiseeCard) => {
     const term = searchQuery.toLowerCase();
     if (isFranchisee) {
       const liveItem = item as LiveFranchisorMatch;
       return liveItem.companyName.toLowerCase().includes(term);
     }
-    const franchiseeItem = item as RealtimeFranchiseeCard;
+    const franchiseeItem = item as LocalFranchiseeCard;
     return franchiseeItem.name.toLowerCase().includes(term);
   });
 
@@ -217,7 +267,7 @@ const MatchingPage = () => {
       return;
     }
 
-    const selected = data.find((item) => item.id === id);
+    const selected = data.find((item: LiveFranchisorMatch | LocalFranchiseeCard) => item.id === id);
 
     const match: Match = {
       id: `match_${Date.now()}`,
@@ -225,13 +275,13 @@ const MatchingPage = () => {
       franchisorId: isFranchisee ? id : currentUser?.id || '',
       franchiseeName: isFranchisee
         ? currentUser?.personalInfo?.firstName || ''
-        : (selected as RealtimeFranchiseeCard)?.name || '',
+        : (selected as LocalFranchiseeCard)?.name || '',
       franchisorName: isFranchisee
         ? (selected as LiveFranchisorMatch)?.companyName || ''
         : currentUser?.personalInfo?.firstName || '',
       franchiseeCompany: '',
       franchisorCompany: isFranchisee ? (selected as LiveFranchisorMatch)?.companyName || '' : '',
-      matchScore: (selected as LiveFranchisorMatch)?.matchScore || (selected as RealtimeFranchiseeCard)?.matchScore || 0,
+      matchScore: (selected as LiveFranchisorMatch)?.matchScore || (selected as LocalFranchiseeCard)?.matchScore || 0,
       status: (isFranchisee ? 'interested_franchisee' : 'interested_franchisor') as Match['status'],
       createdAt: new Date().toISOString(),
     };
@@ -278,20 +328,18 @@ const MatchingPage = () => {
             <p className="text-white/60">
               {isFranchisee
                 ? 'These recommendations are fetched from the Python matching API.'
-                : 'This list uses a realtime Firestore listener on franchisee records.'}
+                : 'These recommendations are generated from backend API or local fallback scoring.'}
             </p>
           </div>
 
-          {isFranchisee && (
-            <Button
-              onClick={() => void loadLiveMatches()}
-              disabled={isLoadingMatches}
-              className="bg-[#1d1d1d] border border-white/15 text-white hover:bg-[#2a2a2a]"
-            >
-              <RotateCcw className="w-4 h-4 mr-2" />
-              {isLoadingMatches ? 'Refreshing...' : 'Refresh Matches'}
-            </Button>
-          )}
+          <Button
+            onClick={() => void loadLiveMatches()}
+            disabled={isLoadingMatches}
+            className="bg-[#1d1d1d] border border-white/15 text-white hover:bg-[#2a2a2a]"
+          >
+            <RotateCcw className="w-4 h-4 mr-2" />
+            {isLoadingMatches ? 'Refreshing...' : 'Refresh Matches'}
+          </Button>
         </div>
 
         <div className="flex items-center gap-6 mb-8 border-b border-white/10">
@@ -339,19 +387,22 @@ const MatchingPage = () => {
 
         {activeTab === 'matches' ? (
           <>
-            {isFranchisee && fetchError && (
+            {fetchError && (
               <div className="mb-6 p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-200 text-sm">
                 {fetchError}
+                <div className="mt-3">
+                  <Button
+                    onClick={() => void loadLiveMatches()}
+                    size="sm"
+                    className="bg-[#1d1d1d] border border-white/20 text-white hover:bg-[#2a2a2a]"
+                  >
+                    Retry
+                  </Button>
+                </div>
               </div>
             )}
 
-            {datasetError && (
-              <div className="mb-6 p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-200 text-sm">
-                Live Firestore feed error: {datasetError}
-              </div>
-            )}
-
-            {isLoadingMatches || (!isFranchisee && isRealtimeLoading) ? (
+            {isLoadingMatches ? (
               <div className="text-white/60">Loading live matches...</div>
             ) : filteredData.length === 0 ? (
               <div className="text-center py-16 text-white/60">
@@ -378,12 +429,12 @@ const MatchingPage = () => {
                               <h3 className="text-lg font-semibold text-white">
                                 {isFranchisee
                                   ? (item as LiveFranchisorMatch).companyName
-                                  : (item as RealtimeFranchiseeCard).name}
+                                  : (item as LocalFranchiseeCard).name}
                               </h3>
                               <p className="text-sm text-white/50">
                                 {isFranchisee
                                   ? (item as LiveFranchisorMatch).contactEmail
-                                  : (item as RealtimeFranchiseeCard).location}
+                                  : (item as LocalFranchiseeCard).location}
                               </p>
                             </div>
                           </div>
@@ -392,7 +443,7 @@ const MatchingPage = () => {
                             <span className="text-sm font-medium text-[#d2a855]">
                               {isFranchisee
                                 ? (item as LiveFranchisorMatch).matchScore
-                                : (item as RealtimeFranchiseeCard).matchScore}
+                                : (item as LocalFranchiseeCard).matchScore}
                               %
                             </span>
                           </div>
@@ -407,7 +458,7 @@ const MatchingPage = () => {
                           </div>
                         ) : (
                           <p className="text-sm text-white/60">
-                            {(item as RealtimeFranchiseeCard).availableCapital}
+                            {(item as LocalFranchiseeCard).availableCapital}
                           </p>
                         )}
                       </div>
@@ -420,7 +471,7 @@ const MatchingPage = () => {
                           </div>
                         ) : (
                           <p className="text-sm text-white/60 mb-4">
-                            {(item as RealtimeFranchiseeCard).experience}
+                            {(item as LocalFranchiseeCard).experience}
                           </p>
                         )}
 
