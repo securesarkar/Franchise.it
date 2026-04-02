@@ -1,5 +1,5 @@
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../lib/firebase';
+import { auth, firebaseStartupStatus } from '../lib/firebase';
 import { getUserProfileByUid, getUserRoleByUid, upsertUserProfile } from '../services/userProfile';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -29,6 +29,16 @@ const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  const isOfflineClient = (): boolean => typeof navigator !== 'undefined' && navigator.onLine === false;
+
+  const isFirestoreUnavailableError = (error: unknown): boolean => {
+    const firestoreError = error as { code?: string; message?: string };
+    const code = firestoreError?.code || '';
+    const message = firestoreError?.message?.toLowerCase() || '';
+
+    return code === 'unavailable' || message.includes('offline') || message.includes('client is offline');
+  };
+
   const getFirebaseAuthErrorMessage = (error: unknown): string => {
     const authError = error as { code?: string; message?: string };
 
@@ -36,13 +46,23 @@ const LoginPage = () => {
       'auth/invalid-credential': 'Invalid email or password.',
       'auth/user-not-found': 'No account found with this email.',
       'auth/wrong-password': 'Incorrect password.',
+      'auth/invalid-api-key': 'Firebase API key is invalid. Please verify Vercel Firebase env values.',
+      'auth/operation-not-allowed': 'Email/password sign-in is disabled in Firebase Authentication.',
       'auth/invalid-email': 'Invalid email address.',
       'auth/too-many-requests': 'Too many attempts. Please try again later.',
       'auth/network-request-failed': 'Network error. Please check your internet connection and retry.',
       'auth/user-disabled': 'This account has been disabled. Please contact support.',
     };
 
-    return errorMessages[authError.code || ''] || authError.message || 'Login failed. Please try again.';
+    if (authError.code && errorMessages[authError.code]) {
+      return errorMessages[authError.code];
+    }
+
+    if (authError.code) {
+      return `Login failed (${authError.code}). ${authError.message || 'Please try again.'}`;
+    }
+
+    return authError.message || 'Login failed (unknown error). Please try again.';
   };
 
   const handleLogin = async () => { 
@@ -52,26 +72,47 @@ const LoginPage = () => {
     return;
   }
 
+  if (!firebaseStartupStatus.isValid) {
+    const missing = firebaseStartupStatus.missingRequiredFirebaseVars.join(', ');
+    toast.error(`Firebase config missing: ${missing}. Please verify Vercel environment variables.`);
+    return;
+  }
+
   setIsLoading(true);
 
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const firebaseUser = userCredential.user;
 
+    let skipFirestoreLookups = isOfflineClient();
+    if (skipFirestoreLookups) {
+      console.warn('[login] offline mode detected; skipping Firestore role/profile lookup');
+      toast.warning('You are offline. Continuing login with cached/default profile data.');
+    }
+
     let profileData: any = null;
-    try {
-      profileData = await getUserProfileByUid(firebaseUser.uid);
-    } catch (profileError) {
-      console.error('[login] profile lookup failed; continuing with auth session', profileError);
-      toast.warning('Signed in, but profile data is currently unavailable.');
+    if (!skipFirestoreLookups) {
+      try {
+        profileData = await getUserProfileByUid(firebaseUser.uid);
+      } catch (profileError) {
+        console.error('[login] profile lookup failed; continuing with auth session', profileError);
+        if (isFirestoreUnavailableError(profileError)) {
+          skipFirestoreLookups = true;
+          toast.warning('Signed in, but Firestore is currently unavailable.');
+        } else {
+          toast.warning('Signed in, but profile data is currently unavailable.');
+        }
+      }
     }
 
     let resolvedRole = role;
-    try {
-      const roleFromUsers = await getUserRoleByUid(firebaseUser.uid);
-      resolvedRole = roleFromUsers ?? role;
-    } catch (roleError) {
-      console.error('[login] role lookup failed; using selected/default role', roleError);
+    if (!skipFirestoreLookups) {
+      try {
+        const roleFromUsers = await getUserRoleByUid(firebaseUser.uid);
+        resolvedRole = roleFromUsers ?? role;
+      } catch (roleError) {
+        console.error('[login] role lookup failed; using selected/default role', roleError);
+      }
     }
 
     if (!resolvedRole) {
@@ -104,17 +145,19 @@ const LoginPage = () => {
     setAuthenticated(true);
     setFirstVisit(false);
 
-    try {
-      await upsertUserProfile({
-        uid: firebaseUser.uid,
-        email: firebaseUser.email || email,
-        displayName: firebaseUser.displayName || 'User',
-        role: resolvedRole,
-        photoURL: firebaseUser.photoURL,
-      });
-    } catch (syncError) {
-      console.error('[login] profile sync failed; auth session remains active', syncError);
-      toast.warning('Signed in, but profile sync failed. Please try again later.');
+    if (!skipFirestoreLookups) {
+      try {
+        await upsertUserProfile({
+          uid: firebaseUser.uid,
+          email: firebaseUser.email || email,
+          displayName: firebaseUser.displayName || 'User',
+          role: resolvedRole,
+          photoURL: firebaseUser.photoURL,
+        });
+      } catch (syncError) {
+        console.error('[login] profile sync failed; auth session remains active', syncError);
+        toast.warning('Signed in, but profile sync failed. Please try again later.');
+      }
     }
 
     toast.success('Welcome back!');
