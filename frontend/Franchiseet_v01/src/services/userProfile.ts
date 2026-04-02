@@ -28,6 +28,16 @@ export interface FirestoreUserProfile {
   lastLoginAt?: unknown;
 }
 
+export interface FranchisorRequirementsPayload {
+  investmentRequired: string;
+  franchiseFee: string;
+  royaltyFee: string;
+  locationRequirements: string;
+  preferredLocations: string[];
+  supportProvided: string[];
+  trainingProgram: string;
+}
+
 const VALID_ROLES: AppRole[] = ['franchisor', 'franchisee'];
 
 function assertRole(role: string): asserts role is AppRole {
@@ -123,4 +133,18 @@ export function roleFromData(data: { role?: unknown }): AppRole | null {
   }
 
   return null;
+}
+
+export async function updateFranchisorRequirements(
+  uid: string,
+  requirements: FranchisorRequirementsPayload,
+): Promise<void> {
+  const now = serverTimestamp();
+  const userRef = doc(db, 'users', uid);
+  const franchisorRef = doc(db, 'franchisors', uid);
+
+  await Promise.all([
+    setDoc(userRef, { requirements, updatedAt: now }, { merge: true }),
+    setDoc(franchisorRef, { requirements, updatedAt: now }, { merge: true }),
+  ]);
 }

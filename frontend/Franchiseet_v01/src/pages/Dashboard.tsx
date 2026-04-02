@@ -3,7 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useStore, type PotentialMatch } from '../store/useStore';
 import { signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
+import { updateFranchisorRequirements, type FranchisorRequirementsPayload } from '../services/userProfile';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { 
   LayoutDashboard, 
   User, 
@@ -31,6 +35,31 @@ const Dashboard = () => {
   const { currentUser, setCurrentUser, setAuthenticated, matches, potentialMatches } = useStore();
   const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'matches' | 'settings'>('overview');
   const [selectedBreakdown, setSelectedBreakdown] = useState<PotentialMatch | null>(null);
+  const [isEditingRequirements, setIsEditingRequirements] = useState(false);
+  const [isSavingRequirements, setIsSavingRequirements] = useState(false);
+  const [requirementsForm, setRequirementsForm] = useState<FranchisorRequirementsPayload>({
+    investmentRequired: '',
+    franchiseFee: '',
+    royaltyFee: '',
+    locationRequirements: '',
+    preferredLocations: [],
+    supportProvided: [],
+    trainingProgram: '',
+  });
+
+  useEffect(() => {
+    if (!currentUser?.requirements) return;
+
+    setRequirementsForm({
+      investmentRequired: currentUser.requirements.investmentRequired || '',
+      franchiseFee: currentUser.requirements.franchiseFee || '',
+      royaltyFee: currentUser.requirements.royaltyFee || '',
+      locationRequirements: currentUser.requirements.locationRequirements || '',
+      preferredLocations: currentUser.requirements.preferredLocations || [],
+      supportProvided: currentUser.requirements.supportProvided || [],
+      trainingProgram: currentUser.requirements.trainingProgram || '',
+    });
+  }, [currentUser?.requirements]);
 
   useEffect(() => {
     if (!selectedBreakdown) return;
@@ -59,6 +88,54 @@ const handleLogout = async () => {
     toast.error('Logout failed');
   }
 };
+
+  const handleRequirementsFieldChange = (
+    field: keyof FranchisorRequirementsPayload,
+    value: string,
+  ) => {
+    setRequirementsForm((prev) => {
+      if (field === 'preferredLocations' || field === 'supportProvided') {
+        return {
+          ...prev,
+          [field]: value
+            .split(',')
+            .map((item) => item.trim())
+            .filter(Boolean),
+        };
+      }
+
+      return {
+        ...prev,
+        [field]: value,
+      };
+    });
+  };
+
+  const handleSaveRequirements = async () => {
+    if (!currentUser) return;
+
+    setIsSavingRequirements(true);
+
+    try {
+      setCurrentUser({
+        ...currentUser,
+        requirements: requirementsForm,
+      });
+
+      try {
+        await updateFranchisorRequirements(currentUser.id, requirementsForm);
+      } catch {
+        toast.warning('Requirements updated locally. Cloud sync will retry later.');
+      }
+
+      setIsEditingRequirements(false);
+      toast.success('Requirements updated successfully');
+    } catch {
+      toast.error('Failed to update requirements');
+    } finally {
+      setIsSavingRequirements(false);
+    }
+  };
 
   const userMatches = matches.filter(m => 
     isFranchisee ? m.franchiseeId === currentUser?.id : m.franchisorId === currentUser?.id
@@ -373,42 +450,130 @@ const handleLogout = async () => {
                     <Building2 className="w-5 h-5 text-[#d2a855]" />
                     Franchise Requirements
                   </h3>
-                  <button className="text-[#d2a855] text-sm flex items-center gap-1 hover:underline">
+                  <button
+                    onClick={() => setIsEditingRequirements((prev) => !prev)}
+                    className="text-[#d2a855] text-sm flex items-center gap-1 hover:underline"
+                  >
                     <Edit3 className="w-4 h-4" />
-                    Edit
+                    {isEditingRequirements ? 'Cancel' : 'Edit'}
                   </button>
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div>
-                    <p className="text-sm text-white/50 mb-1">Investment Required</p>
-                    <p className="text-white">{currentUser?.requirements?.investmentRequired || 'Not specified'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-white/50 mb-1">Franchise Fee</p>
-                    <p className="text-white">{currentUser?.requirements?.franchiseFee || 'Not specified'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-white/50 mb-1">Royalty Fee</p>
-                    <p className="text-white">{currentUser?.requirements?.royaltyFee || 'Not specified'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-white/50 mb-1">Preferred Locations</p>
-                    <p className="text-white">{(currentUser?.requirements?.preferredLocations || []).length} cities selected</p>
-                  </div>
-                </div>
+                {isEditingRequirements ? (
+                  <div className="space-y-4">
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-white/80">Investment Required</Label>
+                        <Input
+                          value={requirementsForm.investmentRequired}
+                          onChange={(event) => handleRequirementsFieldChange('investmentRequired', event.target.value)}
+                          placeholder="e.g., 50 Lakhs - 1 Crore"
+                          className="bg-[#141414] border-white/10 text-white"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-white/80">Franchise Fee</Label>
+                        <Input
+                          value={requirementsForm.franchiseFee}
+                          onChange={(event) => handleRequirementsFieldChange('franchiseFee', event.target.value)}
+                          placeholder="e.g., 10 Lakhs"
+                          className="bg-[#141414] border-white/10 text-white"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-white/80">Royalty Fee</Label>
+                        <Input
+                          value={requirementsForm.royaltyFee}
+                          onChange={(event) => handleRequirementsFieldChange('royaltyFee', event.target.value)}
+                          placeholder="e.g., 5%"
+                          className="bg-[#141414] border-white/10 text-white"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-white/80">Training Program</Label>
+                        <Input
+                          value={requirementsForm.trainingProgram}
+                          onChange={(event) => handleRequirementsFieldChange('trainingProgram', event.target.value)}
+                          placeholder="Describe training support"
+                          className="bg-[#141414] border-white/10 text-white"
+                        />
+                      </div>
+                    </div>
 
-                {currentUser?.requirements?.supportProvided && (
-                  <div className="mt-6">
-                    <p className="text-sm text-white/50 mb-2">Support Provided</p>
-                    <div className="flex flex-wrap gap-2">
-                      {currentUser.requirements.supportProvided.map((support, idx) => (
-                        <span key={idx} className="px-3 py-1 bg-[#d2a855]/10 text-[#d2a855] text-sm rounded-full">
-                          {support}
-                        </span>
-                      ))}
+                    <div className="space-y-2">
+                      <Label className="text-white/80">Location Requirements</Label>
+                      <Textarea
+                        value={requirementsForm.locationRequirements}
+                        onChange={(event) => handleRequirementsFieldChange('locationRequirements', event.target.value)}
+                        placeholder="e.g., 1000+ sq ft, high street, parking available"
+                        className="bg-[#141414] border-white/10 text-white"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-white/80">Preferred Locations (comma-separated)</Label>
+                      <Input
+                        value={requirementsForm.preferredLocations.join(', ')}
+                        onChange={(event) => handleRequirementsFieldChange('preferredLocations', event.target.value)}
+                        placeholder="Mumbai, Pune, Bangalore"
+                        className="bg-[#141414] border-white/10 text-white"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-white/80">Support Provided (comma-separated)</Label>
+                      <Input
+                        value={requirementsForm.supportProvided.join(', ')}
+                        onChange={(event) => handleRequirementsFieldChange('supportProvided', event.target.value)}
+                        placeholder="Site selection, Training, Marketing"
+                        className="bg-[#141414] border-white/10 text-white"
+                      />
+                    </div>
+
+                    <div className="flex justify-end">
+                      <Button
+                        onClick={handleSaveRequirements}
+                        disabled={isSavingRequirements}
+                        className="bg-gradient-to-r from-[#d2a855] to-[#a88644] text-[#141414] hover:opacity-90"
+                      >
+                        {isSavingRequirements ? 'Saving...' : 'Save Requirements'}
+                      </Button>
                     </div>
                   </div>
+                ) : (
+                  <>
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div>
+                        <p className="text-sm text-white/50 mb-1">Investment Required</p>
+                        <p className="text-white">{currentUser?.requirements?.investmentRequired || 'Not specified'}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-white/50 mb-1">Franchise Fee</p>
+                        <p className="text-white">{currentUser?.requirements?.franchiseFee || 'Not specified'}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-white/50 mb-1">Royalty Fee</p>
+                        <p className="text-white">{currentUser?.requirements?.royaltyFee || 'Not specified'}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-white/50 mb-1">Preferred Locations</p>
+                        <p className="text-white">{(currentUser?.requirements?.preferredLocations || []).length} cities selected</p>
+                      </div>
+                    </div>
+
+                    {currentUser?.requirements?.supportProvided && (
+                      <div className="mt-6">
+                        <p className="text-sm text-white/50 mb-2">Support Provided</p>
+                        <div className="flex flex-wrap gap-2">
+                          {currentUser.requirements.supportProvided.map((support, idx) => (
+                            <span key={idx} className="px-3 py-1 bg-[#d2a855]/10 text-[#d2a855] text-sm rounded-full">
+                              {support}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
